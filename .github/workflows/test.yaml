@@ -4,8 +4,8 @@ on:
   - push
   - pull_request
 
-envs:
-  node-versions: [18, 20, 22]
+env:
+  NODE_VERSIONS: [18, 20, 22]
 
 jobs:
   mysql:
@@ -19,7 +19,7 @@ jobs:
           - mysql:5.7
           - mysql:8.0
           - mariadb:10.5
-        node-version: ${{ env.node-versions}}
+        node-version: ${{ env.NODE_VERSIONS}}
 
     services:
       mysql:
@@ -62,7 +62,7 @@ jobs:
           - postgres:16
           - postgres:15
           - postgres:14
-        node-version: ${{ env.node-versions}}
+        node-version: ${{ env.NODE_VERSIONS}}
 
     services:
       postgres:
@@ -102,7 +102,7 @@ jobs:
         mongo-image:
           - mongo:6.0
           - mongo:latest
-        node-version: ${{ env.node-versions}}
+        node-version: ${{ env.NODE_VERSIONS}}
 
     services:
       mongo:
@@ -139,7 +139,7 @@ jobs:
       matrix:
         mongo-version:
           - latest
-        node-version: ${{ env.node-versions}}
+        node-version: ${{ env.NODE_VERSIONS}}
 
     steps:
       - name: Check out
@@ -173,7 +173,7 @@ jobs:
       fail-fast: false
       matrix:
         driver-name: [sqlite, memory]
-        node-version: ${{ env.node-versions}}
+        node-version: ${{ env.NODE_VERSIONS}}
 
     steps:
       - name: Check out
