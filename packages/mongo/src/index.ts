@@ -1,4 +1,4 @@
-import { BSONType, ClientSession, Collection, Db, IndexDescription, Long, MongoClient, MongoClientOptions, MongoError } from 'mongodb'
+import { BSONType, ClientSession, Collection, Db, IndexDescription, Long, MongoClient, MongoClientOptions, MongoError, MongoServerError, MongoServerSelectionError } from 'mongodb'
 import { Binary, Dict, isNullable, makeArray, mapValues, noop, omit, pick } from 'cosmokit'
 import { Driver, Eval, executeUpdate, Field, hasSubquery, Query, RuntimeError, Selection, z } from 'minato'
 import { URLSearchParams } from 'url'
@@ -315,7 +315,9 @@ export class MongoDriver extends Driver<MongoDriver.Config> {
     return this.db
       .collection(transformer.table)
       .aggregate(transformer.pipeline, { allowDiskUse: true, session: this.session })
-      .toArray().then(rows => rows.map(row => this.builder.load(row, sel.model)))
+      .toArray()
+      .then(rows => rows.map(row => this.builder.load(row, sel.model)))
+      .catch(err => this.logError(err, 'get'))
   }
 
   async eval(sel: Selection.Immutable, expr: Eval.Expr) {
@@ -326,6 +328,7 @@ export class MongoDriver extends Driver<MongoDriver.Config> {
       .collection(transformer.table)
       .aggregate(transformer.pipeline, { allowDiskUse: true, session: this.session })
       .toArray()
+      .catch(err => this.logError(err, 'eval'))
     return this.builder.load(res.length ? res[0][transformer.evalKey!] : transformer.aggrDefault, expr)
   }
 
@@ -336,6 +339,7 @@ export class MongoDriver extends Driver<MongoDriver.Config> {
       await this.db.collection(transformer.table)
         .aggregate(transformer.pipeline, { allowDiskUse: true, session: this.session })
         .toArray()
+        .catch(err => this.logError(err, 'set'))
       return {} // result not available
     } else {
       const filter = this.transformQuery(sel, query, table)
@@ -355,7 +359,7 @@ export class MongoDriver extends Driver<MongoDriver.Config> {
         ...$unset.length ? [{ $unset }] : [],
         { $set },
         ...transformer.walkedKeys.length ? [{ $unset: [tempKey] }] : [],
-      ], { session: this.session })
+      ], { session: this.session }).catch(err => this.logError(err, 'set'))
       return { matched: result.matchedCount, modified: result.modifiedCount }
     }
   }
@@ -364,7 +368,7 @@ export class MongoDriver extends Driver<MongoDriver.Config> {
     const { query, table } = sel
     const filter = this.transformQuery(sel, query, table)
     if (!filter) return {}
-    const result = await this.db.collection(table).deleteMany(filter, { session: this.session })
+    const result = await this.db.collection(table).deleteMany(filter, { session: this.session }).catch(err => this.logError(err, 'remove'))
     return { matched: result.deletedCount, removed: result.deletedCount }
   }
 
@@ -390,7 +394,7 @@ export class MongoDriver extends Driver<MongoDriver.Config> {
         { table, field: primary },
         { $inc: { autoInc: missing.length } },
         { session: this.session, upsert: true },
-      )
+      ).catch(err => this.logError(err, 'ensure'))
       for (let i = 1; i <= missing.length; i++) {
         missing[i - 1][primary] = (doc!.autoInc ?? 0) + i
       }
@@ -406,7 +410,7 @@ export class MongoDriver extends Driver<MongoDriver.Config> {
 
       try {
         const copy = this.unpatchVirtual(table, { ...this.builder.dump(data, model) })
-        const insertedId = (await coll.insertOne(copy, { session: this.session })).insertedId
+        const insertedId = (await coll.insertOne(copy, { session: this.session }).catch(err => this.logError(err, 'create'))).insertedId
         if (this.shouldFillPrimary(table)) {
           return { ...data, [model.primary as string]: insertedId }
         } else return data
@@ -451,7 +455,7 @@ export class MongoDriver extends Driver<MongoDriver.Config> {
         const copy = this.builder.dump(executeUpdate(model.create(), update, ref), model)
         bulk.insert(this.unpatchVirtual(table, copy))
       }
-      const result = await bulk.execute({ session: this.session })
+      const result = await bulk.execute({ session: this.session }).catch(err => this.logError(err, 'upsert'))
       return { inserted: result.insertedCount + result.upsertedCount, matched: result.matchedCount, modified: result.modifiedCount }
     } else {
       const bulk = coll.initializeUnorderedBulkOp()
@@ -478,7 +482,7 @@ export class MongoDriver extends Driver<MongoDriver.Config> {
           ...transformer.walkedKeys.length ? [{ $unset: [tempKey] }] : [],
         ])
       }
-      const result = await bulk.execute({ session: this.session })
+      const result = await bulk.execute({ session: this.session }).catch(err => this.logError(err, 'upsert'))
       return { inserted: result.insertedCount + result.upsertedCount, matched: result.matchedCount, modified: result.modifiedCount }
     }
   }
@@ -493,6 +497,21 @@ export class MongoDriver extends Driver<MongoDriver.Config> {
 
   logPipeline(table: string, pipeline: any) {
     this.logger.debug('%s %s', table, JSON.stringify(pipeline, (_, value) => typeof value === 'bigint' ? `${value}n` : value))
+  }
+
+  logError(err: any, label?: string, extra?: any): never {
+    this.logger.warn('%s %s %o', label, err, extra)
+    if (err instanceof MongoServerSelectionError) {
+      this.logger.warn(err.reason)
+      this.logger.warn(err.cause)
+    } else if (err instanceof MongoServerError) {
+      this.logger.warn(err.cause)
+    } else if (err instanceof MongoError) {
+      this.logger.warn(err.message)
+    } else {
+      this.logger.warn(err)
+    }
+    throw err
   }
 }
 
