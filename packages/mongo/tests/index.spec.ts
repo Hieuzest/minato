@@ -31,6 +31,9 @@ describe('@minatojs/driver-mongo', () => {
         aggregateNull: false,
       }
     },
+    migration: {
+      definition: false,
+    },
     transaction: {
       abort: false
     }
