@@ -2,6 +2,7 @@ import { Dict, isNullable, mapValues } from 'cosmokit'
 import { Eval, Field, flatten, isAggrExpr, isComparable, isEvalExpr, isFlat, makeRegExp, Model, Query, Selection, Type, unravel } from 'minato'
 import { Filter, FilterOperators, ObjectId } from 'mongodb'
 import MongoDriver from '.'
+import { symbols } from 'cordis'
 
 function createFieldFilter(query: Query.Field, key: string, type?: Type) {
   const filters: Filter<any>[] = []
@@ -601,7 +602,8 @@ export class Builder {
     let res = value
     res = Type.transform(res, type, (value, type) => this.dump(value, type))
     res = converter?.dump ? converter.dump(res) : res
-    const ancestor = this.driver.database.types[type.type]?.type
+    const types = this.driver.database[symbols.original]?.types ?? this.driver.database.types
+    const ancestor = types[type.type]?.type
     res = this.dump(res, ancestor ? Type.fromField(ancestor) : undefined)
     return res
   }
@@ -612,7 +614,8 @@ export class Builder {
     if (Type.isType(type) || isEvalExpr(type)) {
       type = Type.isType(type) ? type : Type.fromTerm(type)
       const converter = this.driver.types[type.type]
-      const ancestor = this.driver.database.types[type.type]?.type
+      const types = this.driver.database[symbols.original]?.types ?? this.driver.database.types
+      const ancestor = types[type.type]?.type
       let res = this.load(value, ancestor ? Type.fromField(ancestor) : undefined)
       res = converter?.load ? converter.load(res) : res
       res = Type.transform(res, type, (value, type) => this.load(value, type))

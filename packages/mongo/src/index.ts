@@ -158,6 +158,7 @@ export class MongoDriver extends Driver<MongoDriver.Config> {
         bulk.find({ [oldKey]: { $exists: true } }).update({ $rename: { [oldKey]: key } })
       } else {
         found.fields.push(key)
+        if (isNullable(initial)) continue
         bulk.find({}).update({ $set: { [key]: initial ?? null } })
       }
     }
