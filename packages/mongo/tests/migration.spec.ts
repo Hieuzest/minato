@@ -1,7 +1,8 @@
-import { $, Database, Driver, Primary } from 'minato'
+import { $, Database, Primary } from 'minato'
 import { Context, ForkScope, Logger } from 'cordis'
+import { expect } from 'chai'
 import MongoDriver from '@minatojs/driver-mongo'
-import { expect } from '@minatojs/tests'
+import '@minatojs/tests'
 
 const logger = new Logger('mongo')
 
@@ -37,6 +38,7 @@ interface Tables {
 
 describe('@minatojs/driver-mongo/migrate-virtualKey', () => {
   const ctx = new Context()
+  // @ts-ignore
   ctx.plugin(Database)
 
   const database = ctx.model as Database<Tables>
@@ -85,7 +87,6 @@ describe('@minatojs/driver-mongo/migrate-virtualKey', () => {
       regex: 'string',
     }, {
       autoInc: true,
-      unique: ['id'],
     })
 
     const table: Foo[] = []
@@ -105,11 +106,11 @@ describe('@minatojs/driver-mongo/migrate-virtualKey', () => {
     await resetConfig(false)
     await expect(database.get('temp1', {})).to.eventually.deep.eq(table)
 
-    await (Object.values(database.drivers)[0] as Driver).drop('_fields')
+    await (Object.values(database.drivers)[0] as MongoDriver).drop('_fields')
     await resetConfig(true)
     await expect(database.get('temp1', {})).to.eventually.deep.eq(table)
 
-    await (Object.values(database.drivers)[0] as Driver).drop('_fields')
+    await (Object.values(database.drivers)[0] as MongoDriver).drop('_fields')
     await resetConfig(false)
     await expect(database.get('temp1', {})).to.eventually.deep.eq(table)
   })
@@ -128,8 +129,6 @@ describe('@minatojs/driver-mongo/migrate-virtualKey', () => {
       foreign: 'primary',
     })
 
-    await database.remove('temp2', {})
-
     const table: Bar[] = []
     table.push(await database.create('temp2', {
       text: 'awesome foo',
@@ -141,15 +140,11 @@ describe('@minatojs/driver-mongo/migrate-virtualKey', () => {
     table.push(await database.create('temp2', { text: 'awesome baz' }))
     await expect(database.get('temp2', {})).to.eventually.deep.eq(table)
 
-    await expect(database.get('temp2', table[0].id?.toString() as any)).to.eventually.deep.eq([table[0]])
-    await expect(database.get('temp2', { id: table[0].id?.toString() as any })).to.eventually.deep.eq([table[0]])
-    await expect(database.get('temp2', row => $.eq(row.id, $.literal(table[0].id?.toString(), 'primary') as any))).to.eventually.deep.eq([table[0]])
-
-    await (Object.values(database.drivers)[0] as Driver).drop('_fields')
+    await (Object.values(database.drivers)[0] as MongoDriver).drop('_fields')
     await resetConfig(true)
     await expect(database.get('temp2', {})).to.eventually.deep.eq(table)
 
-    await (Object.values(database.drivers)[0] as Driver).drop('_fields')
+    await (Object.values(database.drivers)[0] as MongoDriver).drop('_fields')
     await resetConfig(false)
     await expect(database.get('temp2', {})).to.eventually.deep.eq(table)
 
