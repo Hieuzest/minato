@@ -29,6 +29,7 @@ jobs:
           git add -f packages/mongo/lib/ || true
           git add -f packages/sql-utils/lib/ || true
           git add -f packages/sqlite/lib/ || true
+          git add -f packages/node-sqlite/lib/ || true
           git add -f packages/mysql/lib/ || true
           git add -f packages/postgres/lib/ || true
           git commit -m "chore(release): ${GITHUB_REF#refs/tags/}"

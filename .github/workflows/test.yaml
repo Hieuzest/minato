@@ -15,8 +15,8 @@ jobs:
         mysql-image:
           - mysql:5.7
           - mysql:8.0
-          - mariadb:10.5
-        node-version: [18, 20, 22]
+          - mysql:8.4
+        node-version: [22, 24]
 
     services:
       mysql:
@@ -48,6 +48,48 @@ jobs:
           files: ./coverage/coverage-final.json
           name: codecov
 
+  mariadb:
+    name: ${{ matrix.mariadb-image }} (${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        mariadb-image:
+          - mariadb:10.6
+          - mariadb:11.8
+        node-version: [22, 24]
+
+    services:
+      mariadb:
+        image: ${{ matrix.mariadb-image }}
+        ports:
+          - 3306:3306
+        options: --health-cmd "mariadb-admin ping" --health-interval 10s --health-timeout 5s --health-retries 5
+        env:
+          MARIADB_USER: koishi
+          MARIADB_DATABASE: test
+          MARIADB_PASSWORD: koishi@114514
+          MARIADB_ROOT_PASSWORD: password
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install
+        run: yarn --no-immutable
+      - name: Unit Test
+        run: yarn test:json mysql
+      - name: Report Coverage
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/coverage-final.json
+          name: codecov
+
   postgres:
     name: ${{ matrix.postgres-image }} (${{ matrix.node-version }})
     runs-on: ubuntu-latest
@@ -56,10 +98,12 @@ jobs:
       fail-fast: false
       matrix:
         postgres-image:
+          - postgres:18
+          - postgres:17
           - postgres:16
           - postgres:15
           - postgres:14
-        node-version: [18, 20, 22]
+        node-version: [22, 24]
 
     services:
       postgres:
@@ -99,7 +143,7 @@ jobs:
         mongo-image:
           - mongo:6.0
           - mongo:latest
-        node-version: [18, 20, 22]
+        node-version: [22, 24]
 
     services:
       mongo:
@@ -136,7 +180,7 @@ jobs:
       matrix:
         mongo-version:
           - latest
-        node-version: [18, 20, 22]
+        node-version: [22, 24]
 
     steps:
       - name: Check out
@@ -169,7 +213,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [22]
+        node-version: [22, 24]
 
     steps:
       - name: Check out
@@ -181,7 +225,7 @@ jobs:
       - name: Install
         run: yarn --no-immutable
       - name: Unit Test
-        run: yarn test:json --experimental-sqlite node-sqlite
+        run: yarn test:json node-sqlite
       - name: Report Coverage
         uses: codecov/codecov-action@v4
         with:
@@ -197,7 +241,7 @@ jobs:
       fail-fast: false
       matrix:
         driver-name: [sqlite, memory]
-        node-version: [18, 20, 22]
+        node-version: [22, 24]
 
     steps:
       - name: Check out
