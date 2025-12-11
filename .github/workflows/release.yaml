@@ -1,4 +1,4 @@
-name: Release As Tag
+name: Release
 on:
   push:
     tags:
@@ -6,6 +6,10 @@ on:
 
 jobs:
   release:
+    if: |
+      !contains(github.event.head_commit.message, '[skip ci]') &&
+      !contains(github.event.head_commit.message, '[ci skip]')
+
     runs-on: ubuntu-latest
     steps:
       - name: Check out
@@ -32,6 +36,6 @@ jobs:
           git add -f packages/node-sqlite/lib/ || true
           git add -f packages/mysql/lib/ || true
           git add -f packages/postgres/lib/ || true
-          git commit -m "chore(release): ${GITHUB_REF#refs/tags/}"
-          git tag -f -a -m "Release ${GITHUB_REF#refs/tags/}" "${GITHUB_REF#refs/tags/}"
-          git push https://x-access-token:${{ secrets.RELEASE_PAT }}@github.com/${{ github.repository }}.git ${GITHUB_REF} --force
+          git commit -m "[skip ci] ${GITHUB_REF#refs/tags/}" || true
+          git tag -f "${GITHUB_REF#refs/tags/}"
+          git push -f https://x-access-token:${{ secrets.RELEASE_PAT }}@github.com/${{ github.repository }}.git ${GITHUB_REF}
