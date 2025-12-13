@@ -14,41 +14,5 @@ describe('@minatojs/driver-memory', () => {
     await database.stopAll()
   })
 
-  test(database, {
-    migration: false,
-    update: {
-      index: false,
-    },
-    json: {
-      query: {
-        nullableComparator: false,
-      },
-    },
-    model: {
-      fields: {
-        cast: false,
-        typeModel: false,
-      },
-      object: {
-        nullableComparator: false,
-        typeModel: false,
-      },
-    },
-    query: {
-      comparison: {
-        nullableComparator: false,
-      },
-    },
-    relation: {
-      select: {
-        nullableComparator: false,
-      },
-      create: {
-        nullableComparator: false,
-      },
-      modify: {
-        nullableComparator: false,
-      },
-    },
-  })
+  test(database, {}, { query: { comparison: true } })
 })
