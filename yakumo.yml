@@ -1,4 +1,4 @@
-- name: yakumo
+- name: '@hieuzest/yakumo'
   config:
     pipeline:
       build:
