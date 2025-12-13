@@ -1,5 +1,6 @@
 - name: '@hieuzest/yakumo'
   config:
+    no-builtins: true
     pipeline:
       build:
         - tsc
