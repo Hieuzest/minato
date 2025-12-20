@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": ["../src/index.ts"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA,gCAA6B;AAE7B,oBAA0B;AASnB,IAAM,eAA6B,MAAMA,sBAAqB,uCAAa;AAAA,EAChF,OAAO,OAAO;AAAA,EACd,OAAO,SAAS,gBAAE,OAAO,CAAC,CAAC;AAAA,EAE3B,YAAY,KAAU;AACpB,UAAM,KAAK,EAAE,MAAM,WAAW,CAAC;AAAA,EACjC;AACF;AAEA,IAAO,cAAQ;",
+  "names": ["MemoryDriver"]
+}
