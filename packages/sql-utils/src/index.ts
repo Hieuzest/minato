@@ -609,32 +609,87 @@ export class Builder {
   /**
    * Convert value from Field.Type to Type.
    */
+  load(rows: any[], model: Model): any[]
+  load(value: any, type: Model | Type | Eval.Expr | undefined, root?: boolean): any
   load(value: any, type: Model | Type | Eval.Expr | undefined, root: boolean = true): any {
     if (!type) return value
 
-    if (Type.isType(type) || isEvalExpr(type)) {
-      type = Type.isType(type) ? type : Type.fromTerm(type)
-      const converter = this.driver.types[(root && value && type.type === 'json') ? 'json' : type.type]
-      const ancestor = this.driver.database.types[type.type]?.type
-      let res = this.load(value, ancestor ? Type.fromField(ancestor) : undefined, root)
-      res = this.transform(res, type, 'load')
-      res = converter?.load ? converter.load(res) : res
-      res = Type.transform(res, type, (value, type) => this.load(value, type, false))
-      return (!isNullable(res) && type.inner && !Type.isArray(type)) ? unravel(res) : res
+    const loadFn = this.compileLoad(type, root)
+
+    if (root && Array.isArray(value) && type instanceof Model) {
+      return value.map(loadFn)
     }
 
-    const result = {}
-    for (const key in value) {
-      if (!(key in type.fields)) continue
-      result[key] = value[key]
-      let subroot = root
-      if (subroot && result[key] && this.isEncoded(key)) {
-        subroot = false
-        result[key] = this.driver.types['json'].load(result[key])
+    return loadFn(value)
+  }
+
+  /**
+   * Create a specialized transformer function for a given type.
+   * This avoids repeated type lookups when processing multiple values.
+   */
+  compileTransform(type: Type | Eval.Expr | undefined, method: 'encode' | 'decode' | 'load' | 'dump') {
+    if (!type) return (value: string) => value
+    const resolvedType = Type.isType(type) ? type : Type.fromTerm(type)
+    const ancestorType = this.driver.database.types[resolvedType.type]?.type
+    const transformer = this.transformers[resolvedType.type] ?? this.transformers[ancestorType!]
+    return transformer?.[method] ? (value: string) => transformer[method]!(value) : (value: string) => value
+  }
+
+  /**
+   * Create a specialized loader function for a given type.
+   * This avoids repeated type checks when processing arrays.
+   */
+  compileLoad(type: Model | Type | Eval.Expr | undefined, root: boolean = true) {
+    if (!type) return (value: any) => value
+
+    // Handle Type/Eval.Expr types
+    if (Type.isType(type) || isEvalExpr(type)) {
+      const resolvedType = Type.isType(type) ? type : Type.fromTerm(type)
+      const converter = this.driver.types[(root && resolvedType.type === 'json') ? 'json' : resolvedType.type]
+      const ancestor = this.driver.database.types[resolvedType.type]?.type
+      const ancestorLoadFn = ancestor ? this.compileLoad(Type.fromField(ancestor), root) : null
+      const transformLoadFn = this.compileTransform(resolvedType, 'load')
+      const innerLoaders = new WeakMap<Type, (value: any) => any>()
+      const getInnerLoader = (type?: Type) => {
+        if (!type) return (value: any) => value
+        let loadFn = innerLoaders.get(type)
+        if (!loadFn) {
+          loadFn = this.compileLoad(type, false)
+          innerLoaders.set(type, loadFn)
+        }
+        return loadFn
       }
-      result[key] = this.load(result[key], type.fields[key]!.type, subroot)
+
+      return (value: any) => {
+        let res = ancestorLoadFn ? ancestorLoadFn(value) : value
+        res = transformLoadFn(res)
+        if (converter?.load) res = converter.load(res)
+        if (resolvedType.inner) {
+          res = Type.transform(res, resolvedType, (x, type) => getInnerLoader(type ?? Type.getInner(resolvedType))(x))
+        }
+        return (!isNullable(res) && resolvedType.inner && !Type.isArray(resolvedType)) ? unravel(res) : res
+      }
     }
-    return type.parse(result)
+
+    // Handle Model types
+    const fields = type.fields
+    const fieldKeys = Object.keys(fields)
+    const jsonLoader = this.driver.types['json'].load
+    const loadFns = fieldKeys.map(key => this.compileLoad(fields[key]!.type, true))
+
+    return (value: any) => {
+      const result = {}
+      for (let i = 0; i < fieldKeys.length; i++) {
+        const key = fieldKeys[i]
+        if (!(key in value)) continue
+        let val = value[key]
+        if (val && this.isEncoded(key)) {
+          val = jsonLoader(val)
+        }
+        result[key] = loadFns[i](val)
+      }
+      return type.parse(result)
+    }
   }
 
   /**
