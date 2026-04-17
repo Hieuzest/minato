@@ -78,6 +78,8 @@ export abstract class Driver<T = any> {
 
   public types: Dict<Driver.Transformer> = Object.create(null)
 
+  public tables: Set<string> = new Set()
+
   constructor(public ctx: Context, public config: T) {}
 
   async* [Service.init]() {
