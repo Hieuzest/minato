@@ -27,7 +27,7 @@ jobs:
 
     permissions:
       id-token: write
-      contents: read
+      contents: write
 
     steps:
       - name: Check out
@@ -42,11 +42,15 @@ jobs:
         run: yarn --no-immutable
       - name: Build
         run: yarn build
-      - name: Publish
-        if: >-
-          github.event_name == 'push' &&
-          contains(fromJson('["refs/heads/main"]'), github.ref)
-        run: |-
-          yarn config set npmPublishProvenance true
-          yarn config set npmRegistryServer https://registry.npmjs.org/
-          yarn yakumo publish --debug
+      - name: Publish Tag
+        if: |
+          !contains(github.event.head_commit.message, '[skip ci]') &&
+          !contains(github.event.head_commit.message, '[ci skip]') &&
+          startsWith(github.ref, 'refs/tags/')
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          yarn workspaces foreach --all exec 'git add -f lib || true; git add -f dist || true'
+          git commit -m "[skip ci] ${GITHUB_REF#refs/tags/}" || true
+          git tag -f "${GITHUB_REF#refs/tags/}"
+          git push -f origin ${GITHUB_REF}
